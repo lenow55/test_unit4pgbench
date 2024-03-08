@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "test-unit4pgbench"
+version = "0.1.0"
+description = "Сервис планирования и проведения stress тестирования баз данных postgresql в kubernetes"
+authors = ["Новиков Илья <nov.ilucha@yandex.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+kubernetes = "^29.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
