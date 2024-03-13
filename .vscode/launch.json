@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "python",
+      "name": "Launch full app",
+      "request": "launch",
+      "justMyCode": false,
+      "program": "${file}"
+    }
+  ]
+}
