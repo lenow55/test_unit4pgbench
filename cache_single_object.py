@@ -140,6 +140,7 @@ class ObjectCache(Thread):
 
         for event in iter_response_objects(response):
             if event["object"].get("code") == 410:
+                logger.error(f"code {410}, event: {event}")
                 break
             self._process_event(event)
 
@@ -153,7 +154,7 @@ class ObjectCache(Thread):
             time.sleep(1)
             raise Exception(f"No object with name {self._name}, objects {objects}")
 
-        target_object = target_object_list[0]
+        target_object = target_object_list[-1]
 
         with self._object_cache_lock:
             self._object_cache = target_object
@@ -198,6 +199,7 @@ class ObjectCache(Thread):
                 self._build_cache()
             except Exception as e:
                 logger.error("ObjectCache.run %r", e)
+            # time.sleep(1)
 
     def is_ready(self) -> bool:
         """Must be called only when holding the lock on `_condition`"""
