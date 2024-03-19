@@ -114,7 +114,9 @@ class ObjectCache(Thread):
             success, _ = self.delete(obj["metadata"]["resourceVersion"])
             if success:
                 event4queue = EventResource(
-                    type=EventType.DELETED, source=self._source, status_object={}
+                    type=EventType.DELETED,
+                    source=self._source,
+                    status_object=K8sObject({}),
                 )
                 self._queue.put_nowait(event4queue)
         else:
@@ -163,7 +165,7 @@ class ObjectCache(Thread):
             self._condition.notify()
 
         try:
-            self._do_watch(target_object.metadata.resource_version)
+            self._do_watch(objects.metadata.resource_version)
         finally:
             with self._condition:
                 self._is_ready = False
