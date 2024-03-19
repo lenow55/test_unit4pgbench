@@ -1,0 +1,44 @@
+[
+  {
+    "queries": [
+      {
+        "query": "SELECT abalance FROM pgbench_accounts WHERE aid = :aid;",
+        "analyze": "SELECT abalance FROM pgbench_accounts WHERE aid = 10;"
+      },
+      {
+        "query": "INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);",
+        "analyze": "INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (1, 1, 1, 10, CURRENT_TIMESTAMP);"
+      }
+    ],
+    "template": "query_111111.sql.tpl",
+    "read": {
+      "percent": [
+        50,
+        100,
+        80,
+        5
+      ],
+      "query": 0
+    },
+    "write": {
+      "percent": [
+        50,
+        0,
+        20,
+        95
+      ],
+      "query": 1
+    },
+    "connections": [
+      80,
+      100,
+      200,
+      300
+    ],
+    "size": [
+      200,
+      100,
+      500
+    ]
+  }
+]

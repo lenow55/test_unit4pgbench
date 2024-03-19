@@ -7,6 +7,13 @@
       "request": "launch",
       "justMyCode": false,
       "program": "${file}"
+    },
+    {
+      "type": "python",
+      "name": "Launch main file",
+      "request": "launch",
+      "justMyCode": false,
+      "program": "main.py"
     }
   ]
 }
