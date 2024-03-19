@@ -14,10 +14,13 @@ from cache_single_object import ObjectCache
 from utils import EventResource, SourceEvent
 
 logger = logging.getLogger()
-DEFAULT_FORMAT = "%(asctime)s %(levelname)s: %(message)s"
+fmt = logging.Formatter(
+    fmt="%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 shell_handler = logging.StreamHandler(sys.stdout)
 shell_handler.setLevel(logging.DEBUG)
-shell_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT))
+shell_handler.setFormatter(fmt)
 logger.addHandler(shell_handler)
 logger.setLevel(logging.DEBUG)
 
@@ -85,7 +88,7 @@ def wait_caches(stop_time: float) -> None:
 
 cluster = None
 pgpool = None
-stop_time = time.time() + 30.0
+stop_time = time.time() + 3000000.0
 try:
     with condition:
         wait_caches(stop_time=stop_time)
@@ -111,6 +114,18 @@ if instance_names != instance_statuses.healthy:
 else:
     logger.debug("Cluster ready to use")
 
+if not isinstance(pgpool, K8sObject):
+    raise Exception("PgPool not in kubernetes cluster")
+
+pgpool_replicas = pgpool.status.replicas
+pgpool_ready_replicas = pgpool.status.readyReplicas
+
+if pgpool_replicas != pgpool_ready_replicas:
+    logger.warn("Pgpool in unstable state")
+else:
+    logger.debug("Pgpool ready to use")
+
+list_ids = [1, 2, 3]
 
 while True:
     try:
@@ -124,6 +139,10 @@ while True:
                 for inst_name in instance_names:
                     if inst_name not in new_statuses.healthy:
                         logger.error(f"Instance fail: {inst_name}")
+            if event.source == SourceEvent.PGPOOL:
+                new_ready_replicas = event.status_object.get("readyReplicas")
+                if pgpool_replicas != new_ready_replicas:
+                    logger.error(f"Pgpool replica fails {event.status_object}")
         buffer.task_done()
     except KeyboardInterrupt:
         break
