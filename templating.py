@@ -1,10 +1,11 @@
 import argparse
 import logging
-import sys
 import os
+import sys
+from typing import Iterator
 
-from jinja2 import Environment, FileSystemLoader
 import pandas as pd
+from jinja2 import Environment, FileSystemLoader
 
 from model_pipeline import IndexedCombinations
 
@@ -20,33 +21,51 @@ logger.addHandler(shell_handler)
 logger.setLevel(logging.DEBUG)
 
 
-def main(args):
+def get_next_item(
+    combinations_file: str, state_file: str
+) -> Iterator[IndexedCombinations]:
     try:
-        df_configs = pd.read_json(args.pipeline)
+        df_configs = pd.read_json(combinations_file)
     except Exception as e:
-        logger.error(e)
-        return 1
+        raise e
 
-    config_dict = df_configs.iloc[5].to_dict()
-    config = IndexedCombinations(**config_dict)
-    logger.debug(config)
+    start_index = 0
+    if os.path.exists(state_file):
+        try:
+            with open(state_file) as f:
+                start_index = int(f.read())
+        except Exception as e:
+            logger.error(e)
+            start_index = 0
 
-    environment = Environment(loader=FileSystemLoader(args.templates))
-    template = environment.get_template(config.template)
+    for i in range(start_index, df_configs.shape[0]):
+        config_dict = df_configs.iloc[i].to_dict()
+        config = IndexedCombinations(**config_dict)
+        with open(state_file, mode="w") as f:
+            count_simbols = f.write(str(config.index))
+            if count_simbols == 0:
+                raise Exception(f"Can't write state file {state_file}")
+        yield config
+
+    os.remove(state_file)
+
+
+def gen_template(environment: Environment, combination: IndexedCombinations):
+    template = environment.get_template(combination.template)
 
     queries: list = []
-    if config.read_percent != 0:
+    if combination.read_percent != 0:
         queries.append(
             {
-                "percent": config.read_percent,
-                "line": config.queries[config.read_query_id].query,
+                "percent": combination.read_percent,
+                "line": combination.queries[combination.read_query_id].query,
             }
         )
-    if config.write_percent != 0:
+    if combination.write_percent != 0:
         queries.append(
             {
-                "percent": config.write_percent,
-                "line": config.queries[config.write_query_id].query,
+                "percent": combination.write_percent,
+                "line": combination.queries[combination.write_query_id].query,
             }
         )
 
@@ -59,17 +78,35 @@ def main(args):
         queries[0]["percent"] = queries[0]["percent"] * 2 - 100
 
     elif len(queries) == 0:
-        raise Exception("No query for templste")
+        raise Exception("No query for templ_sql")
     else:
         mixed = False
 
-    content = template.render(scale=config.size, mixed=mixed, queries=queries)
-    filename_split = os.path.splitext(config.template)
-    filename_name = os.path.splitext(filename_split[0])
-    filename = filename_name[0] + f"_{config.index}" + filename_name[1]
-    with open(filename, mode="w", encoding="utf-8") as message:
-        message.write(content)
-        print(f"... wrote {filename}")
+    return template.render(scale=combination.size, mixed=mixed, queries=queries)
+
+
+def main(args):
+    try:
+        environment = Environment(loader=FileSystemLoader(args.templates))
+        if os.path.exists(args.output):
+            raise Exception("output dir exists")
+        else:
+            os.mkdir(args.output)
+        for combination in get_next_item(args.pipeline, "./state"):
+            logger.debug(combination)
+            template = gen_template(environment, combination)
+            filename_split = os.path.splitext(combination.template)
+            filename_name = os.path.splitext(filename_split[0])
+            filename = filename_name[0] + f"_{combination.index}" + filename_name[1]
+            with open(
+                os.path.join(args.output, filename), mode="w", encoding="utf-8"
+            ) as message:
+                message.write(template)
+                print(f"... wrote {filename}")
+
+    except Exception as e:
+        logger.error(e)
+        return 1
 
 
 def parse_args():
