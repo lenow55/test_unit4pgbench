@@ -11,28 +11,19 @@
 BEGIN;
 {% if mixed %}
 {% for query in queries %}
-
 {% if loop.first %}
 \if :choice <= {{ query.percent }}
 {% else %}
 \elif :choice <= {{ query.percent }}
 {% endif %}
-
 {{ query.line }}
-
 {% if loop.last %}
 \endif
 {% endif %}
-
 {% endfor %}
-
-
 {% else %}
 {% for query in queries %}
-
 {{ query.line }}
-
 {% endfor %}
 {% endif %}
-
 END;
