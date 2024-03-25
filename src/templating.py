@@ -124,7 +124,7 @@ def parse_args():
         "--pipeline",
         type=str,
         required=True,
-        default="./pipeline.json",
+        default="./full_pipeline.json",
         help="путь до файла наборов на тестирование",
     )
     parser.add_argument(

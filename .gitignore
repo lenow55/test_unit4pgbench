@@ -2,5 +2,10 @@
 __pycache__/ 
 *.py[cod]
 
+environment/**
+data_out/**
+temp_sql/**
+admin.conf
+
 build/
 *.lock

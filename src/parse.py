@@ -71,9 +71,8 @@ def main(args):
     )
     indexed_combinations_df = combinations_df.reset_index()
 
-    logger.debug(f"\n {indexed_combinations_df.head()}")
-
-    logger.debug(indexed_combinations_df[:4].to_json(orient="records", indent=2))
+    # logger.debug(f"\n {indexed_combinations_df.head()}")
+    logger.debug(f"count configurations: {indexed_combinations_df.shape[0]}")
 
     indexed_combinations_df.to_json(path_or_buf=args.output, orient="records", indent=2)
 
@@ -82,14 +81,6 @@ def main(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-t",
-        "--templates",
-        type=str,
-        required=True,
-        default="./templates",
-        help="путь до папки шаблонов запросов",
-    )
     parser.add_argument(
         "-p",
         "--pipeline",
@@ -103,7 +94,7 @@ def parse_args():
         "--output",
         type=str,
         required=True,
-        default="./output.json",
+        default="./full_pipeline.json",
         help="путь до файла с результирующими наборами конфигураций и id",
     )
     return parser.parse_args()
