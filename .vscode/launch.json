@@ -13,7 +13,8 @@
       "name": "Launch main file",
       "request": "launch",
       "justMyCode": false,
-      "program": "main.py"
+      "program": "src/main.py",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
