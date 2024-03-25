@@ -189,6 +189,7 @@ class RunnerDaemon(Thread):
                         self._logger.error(err)
                         raise RuntimeLoopException("Base init failed: retry")
                     self._logger.info("Base inited")
+                    self._send_message(f"Base reinited with {combination.size}")
                 if self._mode == ModeWork.PGPOOL:
                     self._wait_replication(30.0)
 
@@ -238,7 +239,7 @@ class RunnerDaemon(Thread):
                 # break
                 need_init_db = True
                 counter = counter + 1
-                if counter % 10 == 0:
+                if counter % 3 == 0:
                     self._send_message(f"Processed {counter} tests")
 
             except StopIteration:
