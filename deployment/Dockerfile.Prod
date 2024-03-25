@@ -1,0 +1,41 @@
+FROM python:3.11-slim-bullseye as builder
+
+RUN mkdir app
+WORKDIR /app
+
+COPY poetry.lock pyproject.toml ./
+RUN pip install --no-cache-dir poetry \
+  && poetry config virtualenvs.in-project true \
+  && poetry install --without dev --no-interaction --no-ansi \
+  && rm -rf $(poetry config cache-dir)/{cache,artifacts}
+
+FROM python:3.11-slim-bullseye
+
+# runtime dependencies
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+  gnupg\
+  curl\
+  ; \
+  rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc|\
+  gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+RUN  echo "deb https://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" \
+  > /etc/apt/sources.list.d/pgdg.list
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+  postgresql-16; \
+  rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app /app
+
+RUN mkdir -p /var/run/secrets_dir
+RUN mkdir environment; \
+  mkdir templates
+
+WORKDIR /app
+ENV PATH="/app/.venv/bin:${PATH}"
+
+COPY src/ ./src
