@@ -1,3 +1,4 @@
+import asyncio
 import functools
 from io import TextIOWrapper
 import logging
@@ -14,6 +15,9 @@ from typing import Iterator, List, Tuple
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 from kubernetes.client import CustomObjectsApi
+from aiogram import Bot
+from aiogram import Dispatcher
+
 
 from cache_single_object import ObjectCache
 from model_pipeline import (
@@ -25,7 +29,7 @@ from model_pipeline import (
 from prometheus_utils import check_replication
 from settings import EnvironmentOption, RunSettings
 from templating import gen_template
-from utils import EventResource, K8sObject, SourceEvent
+from utils import EventResource, K8sObject, RuntimeLoopException, SourceEvent
 
 from requests.exceptions import Timeout
 from pydantic import ValidationError
@@ -100,6 +104,9 @@ class RunnerDaemon(Thread):
         self.set_logger()
         self._logger.info("Init complete")
         self._mode = ModeWork.SINGLE
+        self._bot = Bot(token=self._config.bot_token)
+        self._loop_bot = asyncio.get_event_loop()
+        self._dp = Dispatcher()
         try:
             self._environment = Environment(
                 loader=FileSystemLoader(self._config.templates_folder)
@@ -134,18 +141,35 @@ class RunnerDaemon(Thread):
             message.write(template)
         return file_path
 
+    def _send_message(self, message: str):
+        try:
+            self._loop_bot.run_until_complete(
+                self._bot.send_message(chat_id=self._config.bot_admin_id, text=message)
+            )
+        except Exception as e:
+            self._logger.error(e, exc_info=True)
+
     def run(self) -> None:
         continue_iteration: bool = True
         combination_gen = self._get_next_item(
-            self._config.combinations_pipeline, "./state"
+            self._config.combinations_pipeline,
+            os.path.join(self._config.output_folder, "./state"),
+            os.path.join(self._config.output_folder, "./lockfile"),
         )
         need_init_db: bool = True
         try:
             combination = next(combination_gen)
         except StopIteration:
             self._logger.info("No init combination in iterator")
+            self._send_message("No init combination in iterator")
             return
 
+        self._send_message("Start working")
+        self._send_message(
+            f"Would bee processed {self._df_configs.shape[0]} combination"
+        )
+
+        counter: int = 0
         while continue_iteration:
             try:
                 if combination.pgpool:
@@ -163,7 +187,7 @@ class RunnerDaemon(Thread):
                     if code != 0:
                         self._logger.error(f"Base not init; code:{code}, retry ")
                         self._logger.error(err)
-                        continue
+                        raise RuntimeLoopException("Base init failed: retry")
                     self._logger.info("Base inited")
                 if self._mode == ModeWork.PGPOOL:
                     self._wait_replication(30.0)
@@ -183,7 +207,7 @@ class RunnerDaemon(Thread):
                 if code != 0:
                     self._logger.error(f"Test failed; code:{code}, retry ")
                     self._logger.error(err)
-                    continue
+                    raise RuntimeLoopException("Test failed: retry")
 
                 self._logger.info("End testing")
                 self._logger.debug(res)
@@ -213,15 +237,24 @@ class RunnerDaemon(Thread):
                 combination = next(combination_gen)
                 # break
                 need_init_db = True
+                counter = counter + 1
+                if counter % 10 == 0:
+                    self._send_message(f"Processed {counter} tests")
+
             except StopIteration:
                 continue_iteration = True
                 break
             except KeyboardInterrupt:
+                self._send_message("program shutdown")
                 break
+            except RuntimeLoopException as e:
+                self._send_message(f"Runtime exception occure {str(e)}")
             except Exception as e:
                 self._logger.error(e, exc_info=True)
+                self._send_message(f"Exception occure {str(e)}")
 
         self._logger.info("Runner exit")
+        self._send_message("End working")
 
     def run_command_with_watch(self, command: List[str]) -> Tuple[bool, int, str, str]:
         pool_interval = 10.0
@@ -443,12 +476,17 @@ class RunnerDaemon(Thread):
         return True
 
     def _get_next_item(
-        self, combinations_file: str, state_file: str
+        self, combinations_file: str, state_file: str, lockfile: str
     ) -> Iterator[IndexedCombinations]:
         try:
             self._df_configs = pd.read_json(combinations_file)
         except Exception as e:
             raise e
+
+        if os.path.exists(lockfile):
+            self._logger.error("All tests already passed")
+            time.sleep(3000)
+            raise StopIteration()
 
         start_index = 0
         if os.path.exists(state_file):
@@ -469,6 +507,9 @@ class RunnerDaemon(Thread):
             yield config
 
         os.remove(state_file)
+
+        with open(lockfile) as f:
+            f.write("tests passed")
 
     def _check_need_init_db(self, combination: IndexedCombinations) -> bool:
         if combination.index == 0:

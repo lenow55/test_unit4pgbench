@@ -48,6 +48,8 @@ class RunSettings(AdvancedBaseSettings):
     prometheus_port: IntMapStr = Field(default=9090)
     testing_period: IntMapStr = Field(default=120)  # 5 min
     pgbench_threads: IntMapStr = Field(default=10)  # Количество pgbench потоков
+    bot_token: str
+    bot_admin_id: IntMapStr
 
     model_config = SettingsConfigDict(
         # слева на право в порядке приоритетности

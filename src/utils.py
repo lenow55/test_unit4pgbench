@@ -123,8 +123,9 @@ class EventResource:
 
 class ResouceException(Exception):
     def __init__(self, value: Any) -> None:
-        """Create a new instance of :class:`PatroniException` with the given description.
+        self.value = value
 
-        :param value: description of the exception.
-        """
+
+class RuntimeLoopException(Exception):
+    def __init__(self, value: Any) -> None:
         self.value = value
