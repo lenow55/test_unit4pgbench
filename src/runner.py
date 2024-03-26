@@ -166,7 +166,7 @@ class RunnerDaemon(Thread):
 
         self._send_message("Start working")
         self._send_message(
-            f"Would bee processed {self._df_configs.shape[0]} combination"
+            f"Would bee processed {self._df_configs.shape[0] - combination.index} combination"
         )
 
         counter: int = 0
@@ -204,11 +204,21 @@ class RunnerDaemon(Thread):
                 test_command = self._gen_test_command(
                     combination=combination, sql_script_file=sql_script_file
                 )
-                flag_com, code, res, err = self.run_command_with_watch(test_command)
+                flag_com, code, res, err = self.run_command_with_watch(
+                    test_command, float(self._config.testing_period * 2)
+                )
                 if code != 0:
                     self._logger.error(f"Test failed; code:{code}, retry ")
-                    self._logger.error(err)
-                    raise RuntimeLoopException("Test failed: retry")
+                    # self._logger.error(err)
+                    filename_error_test = os.path.join(
+                        self._config.output_folder,
+                        f"test_error_id_{combination.index}.txt",
+                    )
+                    with open(filename_error_test, "w") as file:
+                        file.write(res)
+                        file.write("\n\n")
+                        file.write(err)
+                        raise RuntimeLoopException("Test failed: retry")
 
                 self._logger.info("End testing")
                 self._logger.debug(res)
@@ -240,7 +250,7 @@ class RunnerDaemon(Thread):
                 need_init_db = True
                 counter = counter + 1
                 if counter % 3 == 0:
-                    self._send_message(f"Processed {counter} tests")
+                    self._send_message(f"At processing {combination.index} id")
 
             except StopIteration:
                 continue_iteration = True
@@ -257,7 +267,9 @@ class RunnerDaemon(Thread):
         self._logger.info("Runner exit")
         self._send_message("End working")
 
-    def run_command_with_watch(self, command: List[str]) -> Tuple[bool, int, str, str]:
+    def run_command_with_watch(
+        self, command: List[str], timeout_wait: float = -1
+    ) -> Tuple[bool, int, str, str]:
         pool_interval = 10.0
         processing_flag = True
         self._logger.debug(f"Create subprocess with command: {command}")
@@ -270,6 +282,7 @@ class RunnerDaemon(Thread):
             env=pass_env,
             text=True,
         )
+        stop_wait_time = time.time() + timeout_wait
         while processing_flag:
             try:
                 event = self._buffer.get(timeout=pool_interval)
@@ -282,6 +295,9 @@ class RunnerDaemon(Thread):
                 code = process.poll()
                 if code is None:
                     self._logger.debug("Process alive")
+                    if timeout_wait != -1 and (stop_wait_time - time.time() <= 0):
+                        self._logger.error(f"Process working so long {timeout_wait}")
+                        process.kill()
                     continue
                 self._logger.debug(f"Process complete with code {code}")
                 processing_flag = False
@@ -509,7 +525,7 @@ class RunnerDaemon(Thread):
 
         os.remove(state_file)
 
-        with open(lockfile) as f:
+        with open(lockfile, mode="w") as f:
             f.write("tests passed")
 
     def _check_need_init_db(self, combination: IndexedCombinations) -> bool:
