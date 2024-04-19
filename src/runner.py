@@ -153,8 +153,8 @@ class RunnerDaemon(Thread):
         continue_iteration: bool = True
         combination_gen = self._get_next_item(
             self._config.combinations_pipeline,
-            os.path.join(self._config.output_folder, "./state"),
-            os.path.join(self._config.output_folder, "./lockfile"),
+            os.path.join(self._config.output_folder, "state"),
+            os.path.join(self._config.output_folder, "lockfile"),
         )
         need_init_db: bool = True
         try:
@@ -191,6 +191,7 @@ class RunnerDaemon(Thread):
                     self._logger.info("Base inited")
                     self._send_message(f"Base reinited with {combination.size}")
                 if self._mode == ModeWork.PGPOOL:
+                    self._send_message("Wait replication")
                     self._wait_replication(30.0)
 
                 self._last_size = combination.size
@@ -249,7 +250,7 @@ class RunnerDaemon(Thread):
                 # break
                 need_init_db = True
                 counter = counter + 1
-                if counter % 3 == 0:
+                if counter % 3 == 0 or counter == 1:
                     self._send_message(f"At processing {combination.index} id")
 
             except StopIteration:
@@ -383,7 +384,8 @@ class RunnerDaemon(Thread):
         return result
 
     def _load_resources_statuses(self):
-        stop_time = time.time() + 3000000.0
+        stop_time = time.time() + 60.0
+        stop_time = time.time() + 6000.0
         try:
             with self._condition:
                 self._wait_caches(stop_time=stop_time)
@@ -676,6 +678,7 @@ class RunnerDaemon(Thread):
                         self._config.prometheus_host, self._config.prometheus_port
                     )
                     if check:
+                        self._logger.debug("Still replicating")
                         break
                 except Timeout as e:
                     self._logger.error(f"Check Healthy: {e}")
