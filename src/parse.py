@@ -34,7 +34,7 @@ def main(args):
         logger.error(e)
         return 1
 
-    logger.debug(pipeline)
+    # logger.debug(pipeline)
 
     combinations_items_list: List[CombinationsSettings] = []
 
@@ -62,13 +62,23 @@ def main(args):
     ta = TypeAdapter(List[CombinationsSettings])
 
     combinations_df: DataFrame = pd.DataFrame(ta.dump_python(combinations_items_list))
+    combinations_df = combinations_df.sort_values(by=["size"], ignore_index=True)
+
     combinations_df["pgpool"] = False
     combinations_df_copy = combinations_df.copy()
     combinations_df_copy["pgpool"] = True
-    combinations_df = pd.concat([combinations_df, combinations_df_copy])
-    combinations_df = combinations_df.sort_values(
-        by=["size", "pgpool"], ignore_index=True
-    )
+    # combinations_df = pd.concat([combinations_df, combinations_df_copy])
+    # Формирование нового DataFrame с необходимым порядком строк
+    new_order_df = []
+
+    for i in range(len(combinations_df)):
+        new_order_df.append(combinations_df.iloc[i])
+        new_order_df.append(combinations_df_copy.iloc[i])
+
+    combinations_df = pd.DataFrame(new_order_df)
+    # combinations_df = combinations_df.sort_values(
+    #     by=["size", "pgpool"], ignore_index=True
+    # )
     indexed_combinations_df = combinations_df.reset_index()
 
     # logger.debug(f"\n {indexed_combinations_df.head()}")
