@@ -2,6 +2,7 @@
 \set ntellers 10 * :scale
 \set naccounts 100000 * :scale
 \set nbranches :scale
+\set start_aid random(1, :naccounts - 100)
 \set aid    random(1,:naccounts)
 \set bid    random(1,:nbranches)
 \set tid    random(1,:ntellers)
